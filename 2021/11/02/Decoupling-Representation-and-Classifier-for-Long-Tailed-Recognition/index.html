@@ -1,0 +1,661 @@
+
+
+<!DOCTYPE html>
+<html lang="en" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/bg/site_logo.png">
+  <link rel="icon" href="/img/bg/site_logo.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="description" content="
+图片特征的分布和类别标注的分布本质上是不耦合的，任何不均衡分类数据集的再平衡本质上都应该只是对分类器的再均衡，而不应该用类别的分布改变特征学习时图片特征的分布。">
+  <meta name="author" content="Ruikang Liu">
+  <meta name="keywords" content="">
+  <meta name="description" content="图片特征的分布和类别标注的分布本质上是不耦合的，任何不均衡分类数据集的再平衡本质上都应该只是对分类器的再均衡，而不应该用类别的分布改变特征学习时图片特征的分布。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Decoupling Representation and Classifier for Long-Tailed Recognition">
+<meta property="og:url" content="https://ruikangliu.github.io/2021/11/02/Decoupling-Representation-and-Classifier-for-Long-Tailed-Recognition/index.html">
+<meta property="og:site_name" content="Ruikang Liu&#39;s homepage">
+<meta property="og:description" content="图片特征的分布和类别标注的分布本质上是不耦合的，任何不均衡分类数据集的再平衡本质上都应该只是对分类器的再均衡，而不应该用类别的分布改变特征学习时图片特征的分布。">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-180820.png">
+<meta property="og:image" content="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-182421.png">
+<meta property="og:image" content="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-184406.png">
+<meta property="og:image" content="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-210307.png">
+<meta property="og:image" content="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-210307-1.png">
+<meta property="og:image" content="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-210307-2.png">
+<meta property="og:image" content="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-210307-3.png">
+<meta property="og:image" content="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-210307-4.png">
+<meta property="article:published_time" content="2021-11-02T11:50:48.000Z">
+<meta property="article:modified_time" content="2021-11-03T13:08:36.806Z">
+<meta property="article:author" content="Ruikang Liu">
+<meta property="article:tag" content="long-tailed problem">
+<meta property="article:tag" content="re-sampling">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-180820.png">
+  
+  <title>Decoupling Representation and Classifier for Long-Tailed Recognition - Ruikang Liu&#39;s homepage</title>
+
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4/dist/css/bootstrap.min.css" />
+
+
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@4/github-markdown.min.css" />
+  <link  rel="stylesheet" href="/lib/hint/hint.min.css" />
+
+  
+    
+    
+      
+      <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@10/styles/github-gist.min.css" />
+    
+  
+
+  
+    <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3/dist/jquery.fancybox.min.css" />
+  
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_ba1fz6golrf.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_kmeydafke9r.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+<!-- 自定义样式保持在最底部 -->
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    var CONFIG = {"hostname":"ruikangliu.github.io","root":"/","version":"1.8.12","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"right","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"copy_btn":true,"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":true,"baidu":null,"google":null,"gtag":null,"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":"S79G4wWwynDNkmh5eoEnIOJ9-MdYXbMMI","app_key":"fU0pRxPhr6hK1RqhDTYM9JSH","server_url":null,"path":"window.location.pathname"}},"search_path":"/local-search.xml"};
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+<!-- hexo injector head_end start -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/hexo-math@4.0.0/dist/style.css">
+<!-- hexo injector head_end end --><meta name="generator" content="Hexo 5.4.0"></head>
+
+
+<body>
+  <header style="height: 70vh;">
+    <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>lianlio</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                Home
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                Archives
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/">
+                <i class="iconfont icon-category-fill"></i>
+                Categories
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                Tags
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/">
+                <i class="iconfont icon-user-fill"></i>
+                About
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              &nbsp;<i class="iconfont icon-search"></i>&nbsp;
+            </a>
+          </li>
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">&nbsp;<i
+                class="iconfont icon-dark" id="color-toggle-icon"></i>&nbsp;</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+    <div class="banner" id="banner" parallax=true
+         style="background: url('https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-180820.png') no-repeat center center;
+           background-size: cover;">
+      <div class="full-bg-img">
+        <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+          <div class="page-header text-center fade-in-up">
+            <span class="h2" id="subtitle" title="Decoupling Representation and Classifier for Long-Tailed Recognition">
+              
+            </span>
+
+            
+              <div class="mt-3">
+  
+  
+    <span class="post-meta">
+      <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+      <time datetime="2021-11-02 19:50" pubdate>
+        November 2, 2021 pm
+      </time>
+    </span>
+  
+</div>
+
+<div class="mt-1">
+  
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-chart"></i>
+      8.2k words
+    </span>
+  
+
+  
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-clock-fill"></i>
+      
+      
+      26 minutes
+    </span>
+  
+
+  
+  
+    
+      <!-- LeanCloud 统计文章PV -->
+      <span id="leancloud-page-views-container" class="post-meta" style="display: none">
+        <i class="iconfont icon-eye" aria-hidden="true"></i>
+        <span id="leancloud-page-views"></span> times
+      </span>
+    
+  
+</div>
+
+            
+          </div>
+
+          
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="d-none d-lg-block col-lg-2"></div>
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div class="py-5" id="board">
+          <article class="post-content mx-auto">
+            <!-- SEO header -->
+            <h1 style="display: none">Decoupling Representation and Classifier for Long-Tailed Recognition</h1>
+            
+            <div class="markdown-body">
+              <ul>
+<li>图片特征的分布和类别标注的分布本质上是不耦合的，任何不均衡分类数据集的再平衡本质上都应该只是对分类器的再均衡，而不应该用类别的分布改变特征学习时图片特征的分布。<span id="more"></span>也就是说，模型完全可以从类别不均衡的数据集中学得样本特征，类别的不均衡只会对分类器产生影响，re-sampling、re-weighting 等方法本质上都应该去平衡分类器的决策边界，而不应该去影响样本特征的学习</li>
+</ul>
+<h1>Introduction</h1>
+<ul>
+<li>
+<p>One typical classifier includes a feature extractor (i.e. backbone) $f(x; θ) = z$ and a classifier $g(z) = W^Tz + b$, which can be formulated as $\tilde y = \arg \max g(z)$. Most of the existing solutions for long-tailed recognition adhere to the scheme of jointly learning representations ($\theta$) and classifiers ($W,b$). However, this paper devised a scheme that <strong>decouple the learning procedure into representation learning and classification</strong>, which set new <strong>SOTA</strong> on common long-tailed benchmarks like ImageNet-LT, Places-LT and iNaturalist. In the experiment, the authors also found surprising results that <strong>instance-balanced sampling learns the best and most generalizable representations</strong>, which challenges common beliefs.</p>
+</li>
+<li>
+<p>What is more, this paper also proposed several <strong>learning methods for classification</strong> used in the decoupled learning scheme, including  1) re-training the parametric linear classifier in a class-balancing manner (i.e., <strong>re-sampling</strong>); 2) <strong>non-parametric nearest class mean classifier</strong>, which classifies the data based on their closest class-specific mean representations from the training set; and 3) <strong>normalizing the classifier weights</strong>, which adjusts the weight magnitude directly to be more balanced, adding a temperature to modulate the normalization procedure.</p>
+</li>
+</ul>
+<h1>Learning Representations for long-tailed recognition</h1>
+<ul>
+<li>
+<p><strong>Sampling strategies</strong>: Instance-balanced sampling, Class-balanced sampling, Square-root sampling, Progressively-balanced sampling</p>
+</li>
+<li>
+<p><strong>Loss re-weighting strategies</strong></p>
+</li>
+</ul>
+<h1>Classification for long-tailed recognition</h1>
+<ul>
+<li>
+<p><strong>Classifier Re-training (cRT)</strong>: Re-train the classifier with class-balanced sampling. That is, keeping the representations fixed, we randomly re-initialize and optimize the classifier weights $W$ and $b$ for a small number of epochs using class-balanced sampling.</p>
+</li>
+<li>
+<p><strong>Nearest Class Mean classifier (NCM)</strong>: First compute the mean feature representation for each class on the training set and then perform nearest neighbor search either using cosine similarity or the Euclidean distance computed on $L_2$ normalized mean features. Despite its simplicity, this is a strong baseline; the cosine similarity alleviates the weight imbalance problem via its inherent normalization.</p>
+</li>
+<li>
+<p>$τ$-normalized classifier (<strong>$τ$-normalized</strong>). We investigate an efficient approach to re-balance the decision boundaries of classifiers, inspired by an empirical observation: After joint training with instance-balanced sampling, the norms of the weights $||w_j||$ are correlated with the cardinality of the classes $n_j$, while, after fine-tuning the classifiers using class-balanced sampling, the norms of the classifier weights tend to be more similar. <strong>Inspired by the above observations</strong>, we scale the weights of $W$ to get $\tilde W = {\tilde w_j }$ by:<br>
+$$<br>
+\tilde w_i=f_i*w_i,\text{where }f_i=\frac{1}{||w_i||^\tau}<br>
+$$<br>
+where $τ$ is a hyper-parameter controlling the “temperature” of the normalization.  We empirically choose $τ ∈ (0, 1)$ such that the weights can be rectified smoothly. After $τ$-normalization, the classification logits are given by $\hat y = \tilde W^Tf(x; θ)$. Note that we discard the bias term $b$ here due to its negligible effect on the logits and final predictions.</p>
+</li>
+<li>
+<p><strong>Learnable weight scaling (LWS)</strong>: Although for $τ$-normalized in general $τ$ is chosen through cross-validation, we further investigate <strong>learning $f_i$ on the training set, using class-balanced sampling</strong>. In this case, we keep both the representations and classifier weights fixed and only learn the scaling factors $f_i$.</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>Performance drops when a deeper classifier is used.</strong> (1 layer is the best) The author explains that it means the backbone network is enough to learn discriminative representation.</p>
+</blockquote>
+<h1>Experiments</h1>
+<h2 id="Experiment">Experiment</h2>
+<ul>
+<li><strong>Datasets</strong>: Places-LT, ImageNet-LT, iNaturalist 2018.</li>
+<li><strong>Evaluation Protocol</strong>: (1) $All$ (top-1 accuracy over all classes). To better examine performance variations across classes with different number of examples, we further report accuracy on three splits of the set of classes: (2) $Many$-$shot$ (more than 100 images), (3) $Medium$-$shot$ (20∼100 images) and (4) $Few$-$shot$ (less than 20 images).</li>
+<li><strong>Implementation</strong>:
+<ul>
+<li><strong>backbone</strong>:
+<ul>
+<li>Places-LT: ResNet-152 (pretrained on ImageNet-2012)</li>
+<li>ImageNet-LT: ResNet-{10,50,101,152} and ResNeXt-{50,101,152}(32x4d)</li>
+<li>iNaturalist 2018: ResNet-{50,101,152}</li>
+</ul>
+</li>
+<li><strong>others</strong>: SGD <strong>optimizer</strong> with momentum 0.9, batch size 512, cosine learning rate schedule (<a target="_blank" rel="noopener" href="https://arxiv.org/abs/1608.03983v3">Loshchilov &amp; Hutter, 2016</a>) gradually decaying from 0.2 to 0 and <strong>image resolution</strong> 224 × 224. In the first representation learning stage, the backbone network is usually trained for 90 epochs. In the second stage, i.e., for retraining a classifier (cRT), we restart the learning rate and train it for 10 epochs while keeping the backbone network fixed.</li>
+</ul>
+</li>
+</ul>
+<h2 id="Sampling-strategies-and-decoupled-learning">Sampling strategies and decoupled learning</h2>
+<ul>
+<li>We first train models to learn representations with different sampling strategies. Next, we study three different basic approaches to obtain a classifier with balanced decision boundaries, on top of the learned representations.</li>
+</ul>
+<hr>
+<p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-180820.png" srcset="/img/loading.gif" lazyload alt=""></p>
+<p><strong>Key observations</strong>:</p>
+<ul>
+<li><strong>Sampling matters when training jointly</strong>. From the Joint results in Figure 1 across sampling methods and splits, we see consistent gains in performance when using better sampling strategies. The trends are consistent for the overall performance as well as the medium- and few-shot classes, with <strong>progressively-balanced sampling giving the best results</strong>.</li>
+<li><strong>Decoupling representation and classifier is desirable for long-tailed recognition</strong>. For most cases presented in Figure 1, performance using decoupled methods is significantly better in terms of overall performance, as well as all splits apart from the many-shot case.
+<ul>
+<li>To further justify our claim that it is beneficial to decouple representation and classifier, we experiment with fine-tuning the backbone network (ResNeXt-50) jointly with the linear classifier. In Table 1, we present results when fine-tuning the whole network with standard or smaller (0.1×) learning rate, fine-tuning only the last block in the backbone, or only retraining the linear classifier and fixing the representation. Fine-tuning the whole network yields the worst performance (46.3%and 48.8%), while keeping the representation frozen performs best (49.5%). The trend is even more evident for the medium/few-shot classes.</li>
+</ul>
+</li>
+</ul>
+<p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-182421.png" srcset="/img/loading.gif" lazyload alt=""></p>
+<ul>
+<li><strong>Instance-balanced sampling gives the most generalizable representations</strong>. This is particularly interesting, as it implies that <strong>data imbalance might not be an issue learning high-quality representations</strong>.</li>
+</ul>
+<h1>How to balance your classifier?</h1>
+<p><strong>NCM v.s. cRT v.s. $\tau$-norm</strong></p>
+<ul>
+<li>The non-parametric <strong>NCM seems to perform slightly worse than cRT and $τ$-normalization</strong>. Those two methods are consistently better in most cases apart from the few-shot case, where NCM performs comparably.</li>
+</ul>
+<hr>
+<p><strong>Weight norm and training data distribution visualization</strong></p>
+<p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-184406.png" srcset="/img/loading.gif" lazyload alt=""></p>
+<blockquote>
+<p>Class index is sorted in a descending manner with respect to the number of instances in the training set.</p>
+</blockquote>
+<ul>
+<li>We can observe that the weight norm of the joint classifier (blue line) is positively correlated with the number of training instances of the corresponding class. <strong>More-shot classes tend to learn a classifier with larger magnitudes</strong>. This yields a <strong>wider classification boundary</strong> in feature space, allowing the classifier to have much higher accuracy on data-rich classes, but hurting data-scarce classes.</li>
+</ul>
+<hr>
+<p><strong>Accuracy with different values of the normalization parameter $τ$</strong></p>
+<p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-210307.png" srcset="/img/loading.gif" lazyload alt=""></p>
+<ul>
+<li>The figure shows that as $τ$ increases from 0, many-shot accuracy decays dramatically while few-shot accuracy increases dramatically.</li>
+</ul>
+<h1>Comparison with the SOTA on long-tailed datasets</h1>
+<p><strong>ImageNet-LT</strong></p>
+<p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-210307-1.png" srcset="/img/loading.gif" lazyload alt=""></p>
+<p><strong>iNaturalist 2018</strong></p>
+<p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-210307-2.png" srcset="/img/loading.gif" lazyload alt=""></p>
+<p><strong>Places-LT</strong></p>
+<p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-210307-3.png" srcset="/img/loading.gif" lazyload alt=""></p>
+<h1>On the exploration of determining $\tau$</h1>
+<ul>
+<li>The current tau-normalization strategy does require a validation set to choose tau, which could be a disadvantage depending on the practical scenario. Can we do better?</li>
+<li><strong>Finding $τ$ value on training set</strong>. We also attempted to select $τ$ directly on the training dataset. Surprisingly, final performance on testing set is very similar, with $τ$ selected using training set only.
+<ul>
+<li>We achieve this goal by simulating a balanced testing distribution from the training set. We first feed the whole training set through the network to get the top-1 accuracy for each of the classes. Then, we average the class-specific accuracies and use the averaged accuracy as the metric to determine the tau value. As shown in Table 9, we compare the $τ$ found on training set and validation set for all three datasets. We can see that both the value of $τ$ and the overall performances are very close to each other, which demonstrates the effectiveness of searching for $τ$ on training set.</li>
+</ul>
+</li>
+<li><strong>Learning $τ$ value on training set</strong>. We further investigate if we can <strong>automatically learn the $τ$ value instead of grid search</strong>. To this end, following cRT, we set $τ$ as a learnable parameter and learn it on the training set with balanced sampling, while keeping all the other parameters fixed (including both the backbone network and classifier). Also, we compare the learned $τ$ value and the corresponding results in the Table 9. This further reduces the manual effort of searching best $τ$ values and make the strategy more accessible for practical usage.</li>
+</ul>
+<p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/03/20211103-210307-4.png" srcset="/img/loading.gif" lazyload alt=""></p>
+<h1>References</h1>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://arxiv.org/abs/1910.09217">Decoupling Representation and Classifier for Long-Tailed Recognition, ICLR 2020</a></li>
+<li>code: <a target="_blank" rel="noopener" href="https://github.com/facebookresearch/classifier-balancing">https://github.com/facebookresearch/classifier-balancing</a></li>
+<li><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/158638078">长尾分布下分类问题的最新研究 (持续更新)</a></li>
+</ul>
+
+            </div>
+            <hr>
+            <div>
+              <div class="post-metas mb-3">
+                
+                  <div class="post-meta mr-3">
+                    <i class="iconfont icon-category"></i>
+                    
+                      <a class="hover-with-bg" href="/categories/machine-learning/">machine learning</a>
+                    
+                      <a class="hover-with-bg" href="/categories/machine-learning/long-tailed-problem/">long-tailed problem</a>
+                    
+                  </div>
+                
+                
+                  <div class="post-meta">
+                    <i class="iconfont icon-tags"></i>
+                    
+                      <a class="hover-with-bg" href="/tags/long-tailed-problem/">long-tailed problem</a>
+                    
+                      <a class="hover-with-bg" href="/tags/re-sampling/">re-sampling</a>
+                    
+                  </div>
+                
+              </div>
+              
+                <p class="note note-warning">
+                  
+                    All articles in this blog adopt the <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/deed.zh" rel="nofollow noopener noopener">CC BY-SA 4.0 agreement</a>. Please indicate the source for reprinting!
+                  
+                </p>
+              
+              
+                <div class="post-prevnext">
+                  <article class="post-prev col-6">
+                    
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+              <!-- Comments -->
+              <article class="comments" id="comments" lazyload>
+                
+                  
+                
+                
+  <div id="waline"></div>
+  <script type="text/javascript">
+    Fluid.utils.loadComments('#waline', function() {
+      Fluid.utils.createScript('https://cdn.jsdelivr.net/npm/@waline/client@1/dist/Waline.min.js', function() {
+        var options = Object.assign(
+          {"serverURL":"https://blog-api-cxj3pfnm0-ruikangliu.vercel.app/","path":"window.location.pathname","placeholder":null,"meta":["nick","mail","link"],"requiredMeta":["nick"],"lang":"en","emoji":["https://cdn.jsdelivr.net/gh/walinejs/emojis/weibo"],"dark":"html[data-user-color-scheme=\"dark\"]","avatar":"retro","avatarCDN":"https://seccdn.libravatar.org/avatar/","avatarForce":false,"wordLimit":0,"pageSize":10,"highlight":true},
+          {
+            el: '#waline',
+            path: window.location.pathname
+          }
+        )
+        new Waline(options);
+        Fluid.utils.waitElementVisible('#waline .vcontent', () => {
+          Fluid.plugins.initFancyBox('#waline .vcontent img:not(.vemoji)');
+        })
+      });
+    });
+  </script>
+  <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+              </article>
+            
+          </article>
+        </div>
+      </div>
+    </div>
+    
+      <div class="d-none d-lg-block col-lg-2 toc-container" id="toc-ctn">
+        <div id="toc">
+  <p class="toc-header"><i class="iconfont icon-list"></i>&nbsp;TOC</p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+      </div>
+    
+  </div>
+</div>
+
+<!-- Custom -->
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">Search</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v"
+                 for="local-search-input">keyword</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+
+    
+  </main>
+
+  <footer class="text-center mt-5 py-3">
+  <div class="footer-content">
+     <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+  </div>
+  
+  <div class="statistics">
+    
+    
+
+    
+      
+        <!-- LeanCloud 统计PV -->
+        <span id="leancloud-site-pv-container" style="display: none">
+            Page view: 
+            <span id="leancloud-site-pv"></span>
+            
+          </span>
+      
+      
+        <!-- LeanCloud 统计UV -->
+        <span id="leancloud-site-uv-container" style="display: none">
+            Visitor count:
+            <span id="leancloud-site-uv"></span>
+            
+          </span>
+      
+
+    
+  </div>
+
+
+  
+
+  
+</footer>
+
+
+  <!-- SCRIPTS -->
+  
+  <script  src="https://cdn.jsdelivr.net/npm/nprogress@0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nprogress@0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js" ></script>
+<script  src="https://cdn.jsdelivr.net/npm/bootstrap@4/dist/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+<!-- Plugins -->
+
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+  
+
+
+
+  
+    <script  src="https://cdn.jsdelivr.net/npm/tocbot@4/dist/tocbot.min.js" ></script>
+  
+  
+    <script  src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3/dist/jquery.fancybox.min.js" ></script>
+  
+  
+    <script  src="https://cdn.jsdelivr.net/npm/anchor-js@4/anchor.min.js" ></script>
+  
+  
+    <script defer src="https://cdn.jsdelivr.net/npm/clipboard@2/dist/clipboard.min.js" ></script>
+  
+
+
+
+
+  <script defer src="/js/leancloud.js" ></script>
+
+
+
+  <script  src="https://cdn.jsdelivr.net/npm/typed.js@2/lib/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var title = document.getElementById('subtitle').title;
+      
+      typing(title)
+      
+    })(window, document);
+  </script>
+
+
+
+
+
+  
+
+  
+    <!-- KaTeX -->
+    <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0/dist/katex.min.css" />
+  
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+
+
+
+
+
+<!-- 主题的启动项 保持在最底部 -->
+<script  src="/js/boot.js" ></script>
+
+
+</body>
+</html>
