@@ -4,6 +4,37 @@
   
   
   <entry>
+    <title>BBN: Bilateral-Branch Network with Cumulative Learning for Long-Tailed Visual Recognition</title>
+    <link href="/2021/11/03/BBN-Bilateral-Branch-Network-with-Cumulative-Learning-for-Long-Tailed-Visual-Recognition/"/>
+    <url>/2021/11/03/BBN-Bilateral-Branch-Network-with-Cumulative-Learning-for-Long-Tailed-Visual-Recognition/</url>
+    
+    <content type="html"><![CDATA[<p>这篇论文揭示了在长尾问题中，class re-balancing 策略虽然能有效促进 classifier 学习，但确会损害 feature extractor 的学习，为此提出了新的网络架构 BBN 及其对应的学习策略，用于在充分学习数据特征的同时也能关注到尾部数据。<span id="more"></span>值得一提的是，这篇论文得出的结论与 Decoupling Representation and Classifier for Long-Tailed Recognition 一致，而且还做了更为详尽的实验进行证明，这更加说明了这个结论的正确性。</p><h1>How class re-balancing strategies work?</h1><ul><li>Class re-balancing strategies promote classifier learning significantly but might <strong>damage the universal representative ability</strong> of the learned deep features due to distorting original distributions.</li></ul><hr><p><strong>Experiment</strong></p><ul><li>In order to justify our conjecture, we design a <strong>two-stage experimental fashion</strong> to separately learn representations and classifiers of deep models.<ul><li>Concretely, in the <strong>first stage</strong>, we train a classification network with plain training (i.e., cross-entropy) or re-balancing methods (i.e., re-weighting/re-sampling) as learning manners. Then, we obtain different kinds of feature extractors corresponding to these learning manners.</li><li>When it comes to the <strong>second stage</strong>, we fix the parameters of the feature extractors learned in the former stage, and retrain classifiers from scratch with the aforementioned learning manners again.</li></ul></li></ul><p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/04/20211104-230252.png" alt=""></p><ul><li>By employing <strong>CE</strong> on the representation learning and employing <strong>RS</strong> on the classifier learning, we can achieve the lowest error rate on the validation set of CIFAR-100-IR50. (which <strong>coincides with <a href="https://ruikangliu.github.io/2021/11/02/Decoupling-Representation-and-Classifier-for-Long-Tailed-Recognition/">Decoupling Representation and Classifier for Long-Tailed Recognition</a>!</strong>)</li></ul><hr><p><strong>Affects of re-balancing strategies on the compactness of learned features</strong></p><p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/04/20211104-230305.png" alt=""></p><ul><li>论文还进一步证明了 class re-balancing 的确会损害数据特征的学习。从下图可以看到，由 CE 和 RW 学得的类内特征分布更加分散，而直接由 CE 学得的类内特征分布则更加紧凑，这代表其学得的特征更有效</li></ul><p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/04/20211104-230303.png" alt=""></p><h1>Bilateral-Branch Network (BBN)</h1><p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/04/20211104-230309.png" alt=""></p><p><strong>Data samplers</strong></p><ul><li><p><strong>Uniform sampler</strong>: each sample in the training dataset is <strong>sampled only once</strong> with equal probability in a training epoch. The uniform sampler retains the characteristics of original distributions, and therefore benefits the representation learning.</p></li><li><p><strong>Reversed sampler</strong>: the sampling possibility of each class is proportional to the reciprocal of its sample size. There are three sub-procedures to construct the reversed sampler:</p><ol><li>Calculate the sampling possibility $P_i$ for class $i$ according to the number of samples as $$P_i=\frac{w_i}{\sum_{j=1}^Cw_j}$$where $w_i=\frac{N_{max}}{N_i}$</li><li>Randomly sample a class according to $P_i$</li><li>Uniformly pick up a sample from class $i$ with replacement.</li></ol></li></ul><p><strong>Weights sharing</strong></p><ul><li>Both branches use the same residual network structure and <strong>share all the weights except for the last residual block</strong>.  There are <strong>two benefits</strong> for sharing weights: On the one hand, the well-learned representation by the conventional learning branch can benefit the learning of the re-balancing branch. On the other hand, sharing weights will largely reduce computational complexity in the inference phase.</li></ul><p><strong>Cumulative learning strategy</strong></p><ul><li><strong>Cumulative learning strategy</strong> is proposed to shift the learning focus from the universal patterns to the tail data gradually by controlling both the weights for features produced by two branches and the classification loss $\mathcal L$.</li></ul><p>$$<br>\begin{aligned}<br>z&amp;=\alpha W_c^Tf_c+(1-\alpha)W_r^Tf_r\newline<br>\hat p_i&amp;=\frac{e^{z_i}}{\sum_{j=1}^Ce^{z_j}}\newline<br>\mathcal L &amp;= αE(\hat p, y_c) + (1 − α)E(\hat p, y_r)<br>\end{aligned}<br>$$<br>where $E(·, ·)$ denotes the cross-entropy loss function, and $\alpha$ will gradually decrease as the training epochs increasing:</p><p>$$<br>\alpha=1-\left(\frac{T}{T_{max}}\right)^2<br>$$</p><ul><li>Different from two-stage fine-tuning strategies, <strong>our $α$ ensures that both branches for different goals can be constantly updated in the whole training process, which could avoid the affects on one goal when it performs training for the other goal</strong>.</li></ul><p><strong>Inference phase</strong></p><ul><li>Because both branches are equally important, we simply fix $α$ to 0.5 in the test phase.</li></ul><blockquote><p><strong>BBN v.s. ensemble methods</strong></p><p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/04/20211104-230312.png" alt=""></p></blockquote><h1>Experiments</h1><p><strong>Comparison methods</strong></p><ul><li><strong>Baseline methods</strong>. We employ plaining training with <strong>cross-entropy loss</strong> and focal loss as our baselines. Note that, we also conduct experiments with <strong>a series of mixup algorithms</strong> for comparisons.</li><li><strong>Two-stage fine-tuning strategies</strong>. We train networks with cross-entropy (CE) on imbalanced data in the first stage, and then conduct class re-balancing training in the second stage. “<strong>CE-DRW</strong>” and “<strong>CE-DRS</strong>” refer to the two-stage baselines using re-weighting and re-sampling at the second stage.</li><li><strong>State-of-the-art methods</strong>. For state-of-the-art methods, we compare with the recently proposed <strong>LDAM</strong> and <strong>CB-Focal</strong>.</li></ul><hr><p><strong>long-tailed CIFAR-10 and CIFAR-100</strong></p><p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/04/20211104-230317.png" alt=""></p><p><strong>iNaturalist</strong></p><p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/04/20211104-230320.png" alt=""></p><hr><p><strong>Ablation studies</strong></p><p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/04/20211104-230324.png" alt=""></p><p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/04/20211104-230326.png" alt=""></p><blockquote><p>由下图可以看到，相比其他的 decay 方法，Parabolic decay 在 $\alpha\geq0.5$ 的时间更多，也就是花了更多时间学习全局特征，这也是它表现最好的原因</p><p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/04/20211104-230328.png" alt=""></p></blockquote><hr><p><strong>Validation experiments of our proposals</strong></p><ul><li>Evaluations of feature quality. 给定一个训练好的 BBN 模型，固定 feature extractor 的参数，然后分别重新训练两个分支的 classifier，最后分别测试两个分支各自的错误率。可以看到，用于学习数据特征的 Conventional learning branch 取得的错误率接近直接用  vanilla CE 得到的错误率，说明它的确成功抽取出了全局的数据特征。同时，得益于参数共享，关注尾部数据的 Re-balancing 分支也能取得比重采样和重加权更好的效果</li></ul><p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/04/20211104-230329.png" alt=""></p><ul><li>Visualization of classifier weights. 下图中，$\sigma$ 表示十个类别权重 $L_2$ 范数的标准差，“BBN-ALL” 表示 $W_c$ 和 $W_r$ 合并后的权重。可以看到，“BBN-ALL” 给各个类别的权重都基本相同，并且标准差是最低的；同时，“BBN-CB” 和 “BBN-RB” 的权重范数分布也的确与它们各自的职责相吻合</li></ul><p><img src="https://lianlio-homepage.oss-cn-beijing.aliyuncs.com/img/post/2021/11/04/20211104-230331.png" alt=""></p><h1>References</h1><ul><li><a href="https://arxiv.org/abs/1910.09217">BBN: Bilateral-Branch Network with Cumulative Learning for Long-Tailed Visual Recognition, CVPR 2020</a></li><li>code: <a href="https://github.com/Megvii-Nanjing/BBN">https://github.com/Megvii-Nanjing/BBN</a></li></ul>]]></content>
+    
+    
+    <categories>
+      
+      <category>machine learning</category>
+      
+      <category>long-tailed problem</category>
+      
+    </categories>
+    
+    
+    <tags>
+      
+      <tag>long-tailed problem</tag>
+      
+      <tag>re-sampling</tag>
+      
+      <tag>CVPR 2020</tag>
+      
+    </tags>
+    
+  </entry>
+  
+  
+  
+  <entry>
     <title>Decoupling Representation and Classifier for Long-Tailed Recognition</title>
     <link href="/2021/11/02/Decoupling-Representation-and-Classifier-for-Long-Tailed-Recognition/"/>
     <url>/2021/11/02/Decoupling-Representation-and-Classifier-for-Long-Tailed-Recognition/</url>
@@ -25,6 +56,8 @@
       <tag>long-tailed problem</tag>
       
       <tag>re-sampling</tag>
+      
+      <tag>ICLR 2020</tag>
       
     </tags>
     
